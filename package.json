@@ -10,22 +10,56 @@
       "Other"
   ],
   "activationEvents": [
-      "onCommand:extension.createAnnotation",
-      "onCommand:extension.showAnnotations"
+    "onCommand:extension.createAnnotation",
+    "onCommand:extension.showAnnotations",
+    "onCommand:extension.createAnnotationsView"
+],
+"main": "./extension.js",
+"contributes": {
+  "commands": [
+      {
+          "command": "extension.createAnnotation",
+          "title": "Create Annotation"
+      },
+      {
+          "command": "extension.showAnnotations",
+          "title": "Show Annotations"
+      },
+      {
+          "command": "extension.createAnnotationsView",
+          "title": "View Annotations"
+      }
   ],
-  "main": "./extension.js",
-  "contributes": {
-      "commands": [
+  "viewsContainers": {
+      "activitybar": [
           {
-              "command": "extension.createAnnotation",
-              "title": "Create Annotation"
-          },
-          {
-              "command": "extension.showAnnotations",
-              "title": "Show Annotations"
+              "id": "annotationsViewContainer",
+              "title": "Annotations",
+              "icon":"./images/icon.svg"
           }
       ]
   },
+  "views": {
+      "annotationsViewContainer": [
+          {
+              "id": "annotationsView",
+              "name": "Annotations"
+          }
+      ]
+  }
+},
+"views": {
+  "annotationsView": [
+      {
+          "id": "annotationsTreeView",
+          "name": "Annotations",
+          "when": "view == annotationsView",
+          "settings": {
+              "wordWrap": "on"
+          }
+      }
+  ]
+},
   "scripts": {
       "test": "echo \"No tests specified\" && exit 0"
   },

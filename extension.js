@@ -74,6 +74,9 @@ async function createAnnotation() {
         annotations.push({ filePath: activeEditor.document.fileName, lineNumber, annotation: input });
         saveAnnotations(annotations, annotationsFilePath);
         updateDecorations();
+
+        // Refresh the custom view
+        vscode.commands.executeCommand('extension.createAnnotationsView');
     }
 }
 
@@ -94,6 +97,99 @@ function showAnnotations() {
     panel.webview.html = htmlContent;
 }
 
+// Function to create a custom view to show annotations grouped by file
+function createAnnotationsView() {
+    const view = vscode.window.createTreeView('annotationsView', {
+        treeDataProvider: new AnnotationsDataProvider()
+    });
+    return view;
+}
+
+// Tree data provider for the custom view
+class AnnotationsDataProvider {
+    constructor() {
+        this._onDidChangeTreeData = new vscode.EventEmitter();
+        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+    }
+
+    refresh() {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element) {
+        return element;
+    }
+
+    async getChildren(element) {
+        if (!element) {
+            const annotationsFilePath = getAnnotationsFilePath();
+            const annotations = loadAnnotations(annotationsFilePath);
+            const groupedAnnotations = this.groupAnnotationsByFile(annotations);
+            return Object.keys(groupedAnnotations).map(fileName => {
+                const sortedAnnotations = groupedAnnotations[fileName].sort((a, b) => a.lineNumber - b.lineNumber);
+                return new AnnotationFileItem(fileName, sortedAnnotations);
+            });
+        }
+        return element.annotations.map(annotation => {
+            return new AnnotationItem(annotation);
+        });
+    }
+
+    groupAnnotationsByFile(annotations) {
+        const groupedAnnotations = {};
+        annotations.forEach(annotation => {
+            if (!groupedAnnotations[annotation.filePath]) {
+                groupedAnnotations[annotation.filePath] = [];
+            }
+            groupedAnnotations[annotation.filePath].push(annotation);
+        });
+        return groupedAnnotations;
+    }
+}
+
+// Tree item for file in the custom view
+class AnnotationFileItem extends vscode.TreeItem {
+    constructor(fileName, annotations) {
+        super(fileName, vscode.TreeItemCollapsibleState.Collapsed);
+        this.annotations = annotations;
+    }
+}
+
+// Tree item for annotation in the custom view
+class AnnotationItem extends vscode.TreeItem {
+    constructor(annotation) {
+        super(`Line ${annotation.lineNumber}: ${annotation.annotation}`, vscode.TreeItemCollapsibleState.None);
+        this.annotation = annotation;
+        this.command = {
+            command: 'extension.editAnnotation',
+            title: 'Edit Annotation',
+            arguments: [annotation]
+        };
+    }
+}
+
+// Function to edit an annotation
+async function editAnnotation(annotation) {
+    const newAnnotation = await vscode.window.showInputBox({
+        prompt: 'Edit your annotation',
+        value: annotation.annotation
+    });
+
+    if (newAnnotation !== undefined) {
+        const annotationsFilePath = getAnnotationsFilePath();
+        const annotations = loadAnnotations(annotationsFilePath);
+        const index = annotations.findIndex(a => a.filePath === annotation.filePath && a.lineNumber === annotation.lineNumber);
+        if (index !== -1) {
+            annotations[index].annotation = newAnnotation;
+            saveAnnotations(annotations, annotationsFilePath);
+            vscode.commands.executeCommand('extension.createAnnotationsView');
+            vscode.window.showInformationMessage('Annotation updated successfully.');
+        } else {
+            vscode.window.showErrorMessage('Failed to update annotation.');
+        }
+    }
+}
+
 // Function to activate the extension
 function activate(context) {
     console.log('Annotation extension is now active');
@@ -104,6 +200,15 @@ function activate(context) {
 
     // Command to show all annotations in a sidebar
     disposable = vscode.commands.registerCommand('extension.showAnnotations', showAnnotations);
+    context.subscriptions.push(disposable);
+
+    // Command to edit an annotation
+    disposable = vscode.commands.registerCommand('extension.editAnnotation', editAnnotation);
+    context.subscriptions.push(disposable);
+
+    // Register custom view to show annotations
+    context.subscriptions.push(vscode.window.registerTreeDataProvider('annotationsView', new AnnotationsDataProvider()));
+    disposable = vscode.commands.registerCommand('extension.createAnnotationsView', createAnnotationsView);
     context.subscriptions.push(disposable);
 
     // Register event handler for text document changes (to update decorations)
