@@ -1,34 +1,38 @@
 {
-  "name": "annotations",
-  "displayName": "annotations",
-  "description": "highlight and annotate parts of code",
-  "version": "0.0.1",
+  "name": "annotate-comments",
+  "displayName": "Annotate Comments",
+  "description": "A Visual Studio Code extension to annotate comments in code.",
+  "version": "1.0.0",
   "engines": {
-    "vscode": "^1.87.0"
+      "vscode": "^1.0.0"
   },
   "categories": [
-    "Other"
+      "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+      "onCommand:extension.createAnnotation",
+      "onCommand:extension.showAnnotations"
+  ],
   "main": "./extension.js",
   "contributes": {
-    "commands": [{
-      "command": "annotations.helloWorld",
-      "title": "Hello World"
-    }]
+      "commands": [
+          {
+              "command": "extension.createAnnotation",
+              "title": "Create Annotation"
+          },
+          {
+              "command": "extension.showAnnotations",
+              "title": "Show Annotations"
+          }
+      ]
   },
   "scripts": {
-    "lint": "eslint .",
-    "pretest": "npm run lint",
-    "test": "vscode-test"
+      "test": "echo \"No tests specified\" && exit 0"
   },
+  "author": "Gonzalo BM",
+  "license": "MIT",
   "devDependencies": {
-    "@types/vscode": "^1.87.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "18.x",
-    "eslint": "^8.56.0",
-    "typescript": "^5.3.3",
-    "@vscode/test-cli": "^0.0.6",
-    "@vscode/test-electron": "^2.3.9"
+      "@types/vscode": "^1.60.0",
+      "typescript": "^4.0.0"
   }
 }

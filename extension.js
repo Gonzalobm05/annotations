@@ -1,36 +1,120 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require('vscode');
+const fs = require('fs');
+const path = require('path');
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-
-/**
- * @param {vscode.ExtensionContext} context
- */
-function activate(context) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "annotations" is now active!');
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('annotations.helloWorld', function () {
-		// The code you place here will be executed every time your command is executed
-
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from annotations!');
-	});
-
-	context.subscriptions.push(disposable);
+// Function to get the path for storing annotations
+function getAnnotationsFilePath() {
+    const workspacePath = vscode.workspace.rootPath;
+    return path.join(workspacePath, '.annotations.json');
 }
 
-// This method is called when your extension is deactivated
-function deactivate() {}
+// Function to save annotations to a file
+function saveAnnotations(annotations) {
+    const filePath = getAnnotationsFilePath();
+    fs.writeFileSync(filePath, JSON.stringify(annotations, null, 4), 'utf8');
+}
+
+// Function to load annotations from a file
+function loadAnnotations() {
+    const filePath = getAnnotationsFilePath();
+    if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        return JSON.parse(content);
+    }
+    return [];
+}
+
+// Function to update the decorations (colored markers)
+function updateDecorations() {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+        return;
+    }
+
+    const annotations = loadAnnotations();
+    const decorationType = vscode.window.createTextEditorDecorationType({
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        overviewRulerColor: 'red',
+        overviewRulerLane: vscode.OverviewRulerLane.Right,
+        light: {
+            // This color will be used in light color themes
+            borderColor: 'darkred'
+        },
+        dark: {
+            // This color will be used in dark color themes
+            borderColor: 'lightcoral'
+        }
+    });
+
+    const ranges = annotations.map(annotation => {
+        const lineNumber = annotation.lineNumber - 1; // Adjust for zero-based index
+        const line = activeEditor.document.lineAt(lineNumber);
+        return new vscode.Range(line.range.start, line.range.end);
+    });
+
+    activeEditor.setDecorations(decorationType, ranges);
+}
+
+// Function to create a new annotation
+async function createAnnotation() {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+        return;
+    }
+
+    const lineNumber = activeEditor.selection.active.line + 1; // Convert to one-based index
+    const input = await vscode.window.showInputBox({
+        prompt: 'Enter your annotation'
+    });
+
+    if (input) {
+        const annotations = loadAnnotations();
+        annotations.push({ lineNumber, annotation: input });
+        saveAnnotations(annotations);
+        updateDecorations();
+    }
+}
+
+// Function to show all annotations in a sidebar
+function showAnnotations() {
+    const annotations = loadAnnotations();
+    const panel = vscode.window.createWebviewPanel(
+        'annotationsPanel',
+        'Annotations',
+        vscode.ViewColumn.Two,
+        {}
+    );
+    let htmlContent = '<h1>Annotations</h1>';
+    annotations.forEach(annotation => {
+        htmlContent += `<p>Line ${annotation.lineNumber}: ${annotation.annotation}</p>`;
+    });
+    panel.webview.html = htmlContent;
+}
+
+// Function to activate the extension
+function activate(context) {
+    console.log('Annotation extension is now active');
+
+    // Command to create a new annotation
+    let disposable = vscode.commands.registerCommand('extension.createAnnotation', createAnnotation);
+    context.subscriptions.push(disposable);
+
+    // Command to show all annotations in a sidebar
+    disposable = vscode.commands.registerCommand('extension.showAnnotations', showAnnotations);
+    context.subscriptions.push(disposable);
+
+    // Register event handler for text document changes (to update decorations)
+    vscode.workspace.onDidChangeTextDocument(updateDecorations);
+    updateDecorations(); // Initial decorations update
+}
+
+// Function to deactivate the extension
+function deactivate() {
+    console.log('Annotation extension is now deactivated');
+}
 
 module.exports = {
-	activate,
-	deactivate
-}
+    activate,
+    deactivate
+};
