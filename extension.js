@@ -9,14 +9,12 @@ function getAnnotationsFilePath() {
 }
 
 // Function to save annotations to a file
-function saveAnnotations(annotations) {
-    const filePath = getAnnotationsFilePath();
+function saveAnnotations(annotations, filePath) {
     fs.writeFileSync(filePath, JSON.stringify(annotations, null, 4), 'utf8');
 }
 
 // Function to load annotations from a file
-function loadAnnotations() {
-    const filePath = getAnnotationsFilePath();
+function loadAnnotations(filePath) {
     if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf8');
         return JSON.parse(content);
@@ -31,7 +29,7 @@ function updateDecorations() {
         return;
     }
 
-    const annotations = loadAnnotations();
+    const annotations = loadAnnotations(getAnnotationsFilePath());
     const decorationType = vscode.window.createTextEditorDecorationType({
         borderWidth: '1px',
         borderStyle: 'solid',
@@ -48,10 +46,12 @@ function updateDecorations() {
     });
 
     const ranges = annotations.map(annotation => {
-        const lineNumber = annotation.lineNumber - 1; // Adjust for zero-based index
-        const line = activeEditor.document.lineAt(lineNumber);
-        return new vscode.Range(line.range.start, line.range.end);
-    });
+        if (annotation.filePath === activeEditor.document.fileName) {
+            const lineNumber = annotation.lineNumber - 1; // Adjust for zero-based index
+            const line = activeEditor.document.lineAt(lineNumber);
+            return new vscode.Range(line.range.start, line.range.end);
+        }
+    }).filter(range => range);
 
     activeEditor.setDecorations(decorationType, ranges);
 }
@@ -69,16 +69,18 @@ async function createAnnotation() {
     });
 
     if (input) {
-        const annotations = loadAnnotations();
-        annotations.push({ lineNumber, annotation: input });
-        saveAnnotations(annotations);
+        const annotationsFilePath = getAnnotationsFilePath();
+        const annotations = loadAnnotations(annotationsFilePath);
+        annotations.push({ filePath: activeEditor.document.fileName, lineNumber, annotation: input });
+        saveAnnotations(annotations, annotationsFilePath);
         updateDecorations();
     }
 }
 
 // Function to show all annotations in a sidebar
 function showAnnotations() {
-    const annotations = loadAnnotations();
+    const annotationsFilePath = getAnnotationsFilePath();
+    const annotations = loadAnnotations(annotationsFilePath);
     const panel = vscode.window.createWebviewPanel(
         'annotationsPanel',
         'Annotations',
@@ -87,7 +89,7 @@ function showAnnotations() {
     );
     let htmlContent = '<h1>Annotations</h1>';
     annotations.forEach(annotation => {
-        htmlContent += `<p>Line ${annotation.lineNumber}: ${annotation.annotation}</p>`;
+        htmlContent += `<p>${annotation.filePath}, Line ${annotation.lineNumber}: ${annotation.annotation}</p>`;
     });
     panel.webview.html = htmlContent;
 }
