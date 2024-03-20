@@ -154,42 +154,81 @@ class AnnotationFileItem extends vscode.TreeItem {
         this.annotations = annotations;
     }
 }
-
-// Tree item for annotation in the custom view
 class AnnotationItem extends vscode.TreeItem {
     constructor(annotation) {
-        super(`Line ${annotation.lineNumber}: ${annotation.annotation}`, vscode.TreeItemCollapsibleState.None);
+        super(`Line ${annotation.lineNumber}: ${annotation.annotation}`);
         this.annotation = annotation;
         this.command = {
-            command: 'extension.editAnnotation',
-            title: 'Edit Annotation',
+            command: 'extension.jumpToAnnotation',
+            title: '',
             arguments: [annotation]
         };
+        this.contextValue = 'annotationItem';
     }
 }
 
-// Function to edit an annotation
+// Function to activate the extension
+function activate(context) {
+    console.log('Annotation extension is now active');
+
+    // Command to create a new annotation
+    let disposable = vscode.commands.registerCommand('extension.createAnnotation', createAnnotation);
+    context.subscriptions.push(disposable);
+
+    // Command to show all annotations in a sidebar
+    disposable = vscode.commands.registerCommand('extension.showAnnotations', showAnnotations);
+    context.subscriptions.push(disposable);
+
+    // Command to jump to the annotation's location
+    disposable = vscode.commands.registerCommand('extension.jumpToAnnotation', jumpToAnnotation);
+    context.subscriptions.push(disposable);
+
+    // Command to edit the annotation
+    disposable = vscode.commands.registerCommand('extension.editAnnotation', editAnnotation);
+    context.subscriptions.push(disposable);
+
+    // Register custom view to show annotations
+    context.subscriptions.push(vscode.window.registerTreeDataProvider('annotationsView', new AnnotationsDataProvider()));
+    disposable = vscode.commands.registerCommand('extension.createAnnotationsView', createAnnotationsView);
+    context.subscriptions.push(disposable);
+
+    // Register event handler for text document changes (to update decorations)
+    vscode.workspace.onDidChangeTextDocument(updateDecorations);
+    updateDecorations(); // Initial decorations update
+
+    // Register context menu for annotation items
+    vscode.window.registerTreeItemContextProvider('annotationsView', {
+        provideTreeItemMenus: (item) => {
+            if (item instanceof AnnotationItem) {
+                return [{
+                    label: 'Edit Annotation',
+                    command: 'extension.editAnnotation',
+                    arguments: [item.annotation]
+                }];
+            }
+            return [];
+        }
+    });
+}
+
+// Function to edit the annotation
 async function editAnnotation(annotation) {
-    const newAnnotation = await vscode.window.showInputBox({
+    const input = await vscode.window.showInputBox({
         prompt: 'Edit your annotation',
         value: annotation.annotation
     });
 
-    if (newAnnotation !== undefined) {
+    if (input !== undefined) {
         const annotationsFilePath = getAnnotationsFilePath();
         const annotations = loadAnnotations(annotationsFilePath);
         const index = annotations.findIndex(a => a.filePath === annotation.filePath && a.lineNumber === annotation.lineNumber);
         if (index !== -1) {
-            annotations[index].annotation = newAnnotation;
+            annotations[index].annotation = input;
             saveAnnotations(annotations, annotationsFilePath);
             vscode.commands.executeCommand('extension.createAnnotationsView');
-            vscode.window.showInformationMessage('Annotation updated successfully.');
-        } else {
-            vscode.window.showErrorMessage('Failed to update annotation.');
         }
     }
 }
-
 // Function to activate the extension
 function activate(context) {
     console.log('Annotation extension is now active');
