@@ -46,7 +46,24 @@
               "name": "Annotations"
           }
       ]
-  }
+  },
+  "configuration": {
+    "type": "object",
+    "title": "Annotation Extension",
+    "properties": {
+        "annotationExtension.color": {
+            "type": "string",
+            "default": "#FF0000",
+            "description": "Color of the annotation box"
+        },
+        "annotationExtension.style": {
+            "type": "string",
+            "default": "box",
+            "enum": ["box", "highlight"],
+            "description": "Style of the annotation (box or highlight)"
+        }
+    }
+}
 },
 "views": {
   "annotationsView": [

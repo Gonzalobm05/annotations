@@ -12,7 +12,16 @@ function getAnnotationsFilePath() {
 function saveAnnotations(annotations, filePath) {
     fs.writeFileSync(filePath, JSON.stringify(annotations, null, 4), 'utf8');
 }
-
+// Function to jump to the annotation's location
+function jumpToAnnotation(annotation) {
+    vscode.workspace.openTextDocument(annotation.filePath).then(document => {
+        vscode.window.showTextDocument(document).then(editor => {
+            const position = new vscode.Position(annotation.lineNumber - 1, 0); // Adjust for zero-based index
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(editor.selection, vscode.TextEditorRevealType.InCenter);
+        });
+    });
+}
 // Function to load annotations from a file
 function loadAnnotations(filePath) {
     if (fs.existsSync(filePath)) {
@@ -24,36 +33,41 @@ function loadAnnotations(filePath) {
 
 // Function to update the decorations (colored markers)
 function updateDecorations() {
-    const activeEditor = vscode.window.activeTextEditor;
-    if (!activeEditor) {
-        return;
+const activeEditor = vscode.window.activeTextEditor;
+if (!activeEditor) {
+    return;
+}
+
+const color = vscode.workspace.getConfiguration().get('annotationExtension.color', '#FF0000');
+const style = vscode.workspace.getConfiguration().get('annotationExtension.style', 'box');
+
+const annotations = loadAnnotations(getAnnotationsFilePath());
+const decorationType = vscode.window.createTextEditorDecorationType({
+    backgroundColor:'d15c5c',
+    opacity:'100',
+    borderWidth: '1px',
+    borderStyle: style === 'box' ? 'solid' : 'none',
+    overviewRulerColor: color,
+    overviewRulerLane: vscode.OverviewRulerLane.Right,
+    light: {
+        // This color will be used in light color themes
+        borderColor: color
+    },
+    dark: {
+        // This color will be used in dark color themes
+        borderColor: color
     }
+});
 
-    const annotations = loadAnnotations(getAnnotationsFilePath());
-    const decorationType = vscode.window.createTextEditorDecorationType({
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        overviewRulerColor: 'red',
-        overviewRulerLane: vscode.OverviewRulerLane.Right,
-        light: {
-            // This color will be used in light color themes
-            borderColor: 'darkred'
-        },
-        dark: {
-            // This color will be used in dark color themes
-            borderColor: 'lightcoral'
-        }
-    });
+const ranges = annotations.map(annotation => {
+    if (annotation.filePath === activeEditor.document.fileName) {
+        const lineNumber = annotation.lineNumber - 1; // Adjust for zero-based index
+        const line = activeEditor.document.lineAt(lineNumber);
+        return new vscode.Range(line.range.start, line.range.end);
+    }
+}).filter(range => range);
 
-    const ranges = annotations.map(annotation => {
-        if (annotation.filePath === activeEditor.document.fileName) {
-            const lineNumber = annotation.lineNumber - 1; // Adjust for zero-based index
-            const line = activeEditor.document.lineAt(lineNumber);
-            return new vscode.Range(line.range.start, line.range.end);
-        }
-    }).filter(range => range);
-
-    activeEditor.setDecorations(decorationType, ranges);
+activeEditor.setDecorations(decorationType, ranges);
 }
 
 // Function to create a new annotation
@@ -233,8 +247,12 @@ async function editAnnotation(annotation) {
 function activate(context) {
     console.log('Annotation extension is now active');
 
+    // Register the 'extension.jumpToAnnotation' command
+    let disposable = vscode.commands.registerCommand('extension.jumpToAnnotation', jumpToAnnotation);
+    context.subscriptions.push(disposable);
+
     // Command to create a new annotation
-    let disposable = vscode.commands.registerCommand('extension.createAnnotation', createAnnotation);
+    disposable = vscode.commands.registerCommand('extension.createAnnotation', createAnnotation);
     context.subscriptions.push(disposable);
 
     // Command to show all annotations in a sidebar
